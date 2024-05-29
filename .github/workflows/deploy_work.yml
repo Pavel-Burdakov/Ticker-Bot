@@ -18,8 +18,7 @@
             cache: maven
         - name: run tests
           run: mvn test # Запускаем тесты.
-        - name: mvn build
-          run: mvn -B package --file pom.xml    
+           
        
     prepare-environment:
       runs-on: self-hosted
@@ -43,7 +42,6 @@
               distribution: 'temurin'
               cache: maven          
           - name: mvn build
-            run: mvn clean compile assembly:single  
-          - name: docker-compose
-            run: docker-compose up -d
+            run: mvn -B package --file pom.xml 
+          
        
