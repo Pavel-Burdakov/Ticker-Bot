@@ -1,3 +1,4 @@
+
   on:
     push:
       branches: ["main"]
@@ -43,5 +44,9 @@
               cache: maven          
           - name: mvn build
             run: mvn -B package --file pom.xml
+          - name: move jar and clean local repo
+            run: cp -f /home/dockeruser/actions-runner/_work/Ticker-Bot/Ticker-Bot/target/*.jar /home/dockeruser/actions-runner
+          - name: clean local repo
+            run: rm -R /home/dockeruser/actions-runner/_work/Ticker-Bot
           
        
