@@ -18,8 +18,7 @@
             cache: maven
         - name: run tests
           run: mvn test # Запускаем тесты.
-
-          
+       
     prepare-environment:
       runs-on: self-hosted
       needs: test
