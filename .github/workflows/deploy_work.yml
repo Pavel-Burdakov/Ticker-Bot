@@ -35,7 +35,15 @@
         needs: prepare-environment
         steps:
           - name: checkout repo
-            uses: actions/checkout@v3          
+            uses: actions/checkout@v3
+          - name: set up Java and Maven # Настраиваем Java и Maven.
+            uses: actions/setup-java@v3
+            with:
+              java-version: '21'
+              distribution: 'temurin'
+              cache: maven          
+          - name: mvn build
+            run: mvn -B package --file pom.xml  
           - name: docker-compose
             run: docker-compose up -d
        
