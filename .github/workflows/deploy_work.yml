@@ -43,7 +43,7 @@
               distribution: 'temurin'
               cache: maven          
           - name: mvn build
-            run: mvn -B package --file pom.xml  
+            run: mvn clean compile assembly:single  
           - name: docker-compose
             run: docker-compose up -d
        
