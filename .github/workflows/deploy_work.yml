@@ -47,6 +47,8 @@
             run: cp -f /home/dockeruser/actions-runner/_work/Ticker-Bot/Ticker-Bot/target/*.jar /home/dockeruser/actions-runner
           - name: docker-compose-build
             run: docker compose build
+          - name: push to registry
+            run: docker push pandabamboo/bot:latest
           - name: docker-compose
             run: docker compose up -d
 
