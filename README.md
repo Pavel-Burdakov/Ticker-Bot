@@ -1,3 +1,4 @@
-# exchangeBotTelegram
-Телеграм бот возвращает текущий курс основных валют к рублю.
-Данные запрашиваются с официального сайта ЦБ РФ
+# Ticker Bot Telegramm
+
+
+[![.github/workflows/deploy_work.yml](https://github.com/Pavel-Burdakov/Ticker-Bot/actions/workflows/deploy_work.yml/badge.svg?branch=main)](https://github.com/Pavel-Burdakov/Ticker-Bot/actions/workflows/deploy_work.yml)
