@@ -1,0 +1,28 @@
+version: '2'
+
+services:
+  app:
+    image: 'pandabamboo/bot:latest'
+    build:
+      context: .
+    container_name: app
+    depends_on:
+      - db
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/botdata
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=123
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+
+  db:
+    image: 'postgres:14.2'
+    container_name: db
+    environment:
+      POSTGRES_DB: "botdata"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "123"
+    volumes:
+      - /home/app/db:/var/lib/postgres
+
+    ports:
+       - "5432:5432"

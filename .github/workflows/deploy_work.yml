@@ -1,0 +1,20 @@
+  on:
+    push:
+      branches: ["main"]
+  jobs:
+    test: # Название джобы
+      runs-on: ubuntu-latest   # Где должна выполняться джоба.
+      # Здесь укажем GitHub-hosted runner - среду выполнения, которую предоставляет сам GitHub.
+      steps: # Перечень шагов, которые необходимо выполнить в рамках джобы.
+        - name: cd into repo # Название шага
+          uses: actions/checkout@v3 # Ключевое слово uses используется для запуска заранее
+        # созданного набора команд. В данном случае используем дефолтную команду
+        # для обновления проекта до последнего коммита.
+        - name: set up Java and Maven # Настраиваем Java и Maven.
+          uses: actions/setup-java@v3
+          with:
+            java-version: '21'
+            distribution: 'openjdk'
+            cache: maven
+        - name: run tests
+          run: mvn test # Запускаем тесты.

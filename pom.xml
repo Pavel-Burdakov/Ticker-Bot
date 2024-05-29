@@ -98,6 +98,7 @@
             <version>2.3.1</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.google.guava/guava -->
+        <!-- Удобно для работы с коллекциями -->
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
@@ -112,6 +113,17 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.example.exchangeRate.ExchangeRateApplication</mainClass>
+                    <layout>JAR</layout>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
