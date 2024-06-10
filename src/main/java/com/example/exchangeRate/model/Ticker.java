@@ -1,9 +1,12 @@
 package com.example.exchangeRate.model;
 
 import jakarta.persistence.*;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.transaction.annotation.Transactional;
 
 @Entity
 @Table(name = "tickers")
+
 public class Ticker {
     @Id
     @Column(name = "id")
@@ -13,6 +16,10 @@ public class Ticker {
     private String ticker;
 
     private String price;
+
+    @ManyToOne(cascade = CascadeType.MERGE)
+    @JoinColumn(name = "tguser_id", referencedColumnName = "id")
+    private Tguser tguser;
 
     public Ticker() {
     }
@@ -45,5 +52,13 @@ public class Ticker {
 
     public void setPrice(String price) {
         this.price = price;
+    }
+
+    public Tguser getTguser() {
+        return tguser;
+    }
+
+    public void setTguser(Tguser tguser) {
+        this.tguser = tguser;
     }
 }
