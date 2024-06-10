@@ -29,9 +29,12 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import javax.sql.rowset.serial.SerialException;
+import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+
+import static java.lang.Math.abs;
 
 @Component
 public class Bot extends TelegramLongPollingBot {
@@ -66,6 +69,8 @@ public class Bot extends TelegramLongPollingBot {
     boolean startWait = false;
 
     boolean flagDelta = true;
+
+    DecimalFormat df = new DecimalFormat("#.##");
 
     public Bot(@Value("${bot.token}") String botToken) {
         super(botToken);
@@ -298,9 +303,13 @@ public class Bot extends TelegramLongPollingBot {
                 }
 
                 if (Double.parseDouble(t.getPrice())<currentPrice){
-                    Double dl = currentPrice/Double.parseDouble(t.getPrice())*100-100;
-                    if (dl>=tguser.getDelta()){
-                       message.setText("Цена " + t.getTicker() + " изменилась прежняя цена " + t.getPrice() + " новая " + currentPrice + " увеличилась на " + dl + "%");
+                    double dl = currentPrice/Double.parseDouble(t.getPrice())*100-100;
+                    double roundedNumber = Math.round(dl * 100.0) / 100.0;
+
+                    System.out.println(abs(dl));
+                    System.out.println(tguser.getDelta());
+                    if (abs(dl)>=tguser.getDelta()){
+                       message.setText("Цена " + t.getTicker() + " изменилась прежняя цена " + t.getPrice() + " новая " + currentPrice + " увеличилась на " + roundedNumber + "%");
                        executeMessage(message);
                        Ticker updateTicker = tickerRepository.findByTicker(t.getTicker()).orElseThrow(EntityNotFoundException::new);
                        updateTicker.setPrice(String.valueOf(currentPrice));
@@ -309,12 +318,18 @@ public class Bot extends TelegramLongPollingBot {
                 }
 
                 if (Double.parseDouble(t.getPrice())>currentPrice){
-                    Double dl = 100-Double.parseDouble(t.getPrice())/currentPrice*100;
-                    message.setText("Цена " + t.getTicker() + " изменилась прежняя цена " + t.getPrice() + " новая " + currentPrice + " уменьшилась на " + dl + "%");
-                    executeMessage(message);
-                    Ticker updateTicker = tickerRepository.findByTicker(t.getTicker()).orElseThrow(EntityNotFoundException::new);
-                    updateTicker.setPrice(String.valueOf(currentPrice));
-                    tickerRepository.save(updateTicker);
+                    double dl = 100-Double.parseDouble(t.getPrice())/currentPrice*100;
+                    double roundedNumber = Math.round(dl * 100.0) / 100.0;
+
+                    System.out.println(abs(dl));
+                    System.out.println(tguser.getDelta());
+                    if (abs(dl)>=tguser.getDelta()) {
+                        message.setText("Цена " + t.getTicker() + " изменилась прежняя цена " + t.getPrice() + " новая " + currentPrice + " уменьшилась на " + roundedNumber + "%");
+                        executeMessage(message);
+                        Ticker updateTicker = tickerRepository.findByTicker(t.getTicker()).orElseThrow(EntityNotFoundException::new);
+                        updateTicker.setPrice(String.valueOf(currentPrice));
+                        tickerRepository.save(updateTicker);
+                    }
                 }
 
             }
