@@ -318,6 +318,7 @@ public class Bot extends TelegramLongPollingBot {
                 }
 
                 if (Double.parseDouble(t.getPrice()) > currentPrice) {
+
                     double dl = 100 - Double.parseDouble(t.getPrice()) / currentPrice * 100;
                     double roundedNumber = Math.round(dl * 100.0) / 100.0;
 
