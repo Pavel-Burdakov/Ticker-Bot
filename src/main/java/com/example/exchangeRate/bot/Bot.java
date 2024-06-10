@@ -302,28 +302,28 @@ public class Bot extends TelegramLongPollingBot {
                     throw new RuntimeException(e);
                 }
 
-                if (Double.parseDouble(t.getPrice())<currentPrice){
-                    double dl = currentPrice/Double.parseDouble(t.getPrice())*100-100;
+                if (Double.parseDouble(t.getPrice()) < currentPrice) {
+                    double dl = currentPrice / Double.parseDouble(t.getPrice()) * 100 - 100;
                     double roundedNumber = Math.round(dl * 100.0) / 100.0;
 
                     System.out.println(abs(dl));
                     System.out.println(tguser.getDelta());
-                    if (abs(dl)>=tguser.getDelta()){
-                       message.setText("Цена " + t.getTicker() + " изменилась прежняя цена " + t.getPrice() + " новая " + currentPrice + " увеличилась на " + roundedNumber + "%");
-                       executeMessage(message);
-                       Ticker updateTicker = tickerRepository.findByTicker(t.getTicker()).orElseThrow(EntityNotFoundException::new);
-                       updateTicker.setPrice(String.valueOf(currentPrice));
-                       tickerRepository.save(updateTicker);
+                    if (abs(dl) >= tguser.getDelta()) {
+                        message.setText("Цена " + t.getTicker() + " изменилась прежняя цена " + t.getPrice() + " новая " + currentPrice + " увеличилась на " + roundedNumber + "%");
+                        executeMessage(message);
+                        Ticker updateTicker = tickerRepository.findByTicker(t.getTicker()).orElseThrow(EntityNotFoundException::new);
+                        updateTicker.setPrice(String.valueOf(currentPrice));
+                        tickerRepository.save(updateTicker);
                     }
                 }
 
-                if (Double.parseDouble(t.getPrice())>currentPrice){
-                    double dl = 100-Double.parseDouble(t.getPrice())/currentPrice*100;
+                if (Double.parseDouble(t.getPrice()) > currentPrice) {
+                    double dl = 100 - Double.parseDouble(t.getPrice()) / currentPrice * 100;
                     double roundedNumber = Math.round(dl * 100.0) / 100.0;
 
                     System.out.println(abs(dl));
                     System.out.println(tguser.getDelta());
-                    if (abs(dl)>=tguser.getDelta()) {
+                    if (abs(dl) >= tguser.getDelta()) {
                         message.setText("Цена " + t.getTicker() + " изменилась прежняя цена " + t.getPrice() + " новая " + currentPrice + " уменьшилась на " + roundedNumber + "%");
                         executeMessage(message);
                         Ticker updateTicker = tickerRepository.findByTicker(t.getTicker()).orElseThrow(EntityNotFoundException::new);
@@ -529,7 +529,6 @@ public class Bot extends TelegramLongPollingBot {
         message.setChatId(String.valueOf(chatId));
         message.setText(text);
         message.setMessageId((int) messageId);
-
 
         try {
             execute(message);
