@@ -2,7 +2,9 @@ package com.example.exchangeRate.bot;
 
 import com.example.exchangeRate.exception.serviceException;
 import com.example.exchangeRate.model.Tguser;
+import com.example.exchangeRate.model.Ticker;
 import com.example.exchangeRate.repo.TgUserRepository;
+import com.example.exchangeRate.repo.TickerRepository;
 import com.example.exchangeRate.services.ExchangeRateService;
 import com.example.exchangeRate.services.TickerPriceService;
 import com.example.exchangeRate.services.IndexService;
@@ -26,6 +28,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import javax.sql.rowset.serial.SerialException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -44,6 +47,9 @@ public class Bot extends TelegramLongPollingBot {
 
     @Autowired
     TgUserRepository userRepository;
+
+    @Autowired
+    TickerRepository tickerRepository;
     private final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("MM.dd.yyyy, HH:mm:ss");
     private final int countRowInLine = 3; // количество строк кнопок с выбором акций для отслеживания
 
@@ -56,6 +62,10 @@ public class Bot extends TelegramLongPollingBot {
     private static final String ALL = "/all";
 
     private long idChat = 0;
+
+    boolean startWait = false;
+
+    boolean flagDelta = true;
 
     public Bot(@Value("${bot.token}") String botToken) {
         super(botToken);
@@ -77,7 +87,7 @@ public class Bot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
         // для проверки есть ли вообще сообщение от пользователя
-        if (update.hasMessage() && update.getMessage().hasText()) {
+        if (update.hasMessage() && update.getMessage().hasText() && startWait == false) {
             var message = update.getMessage().getText(); //если сообщение пришло вытаскиваем его в отдельную переменную
             var chatId = update.getMessage().getChatId(); //идентификатор чата, чтобы ответить тому пользователю от которого получен запрос
             idChat = chatId;
@@ -97,8 +107,11 @@ public class Bot extends TelegramLongPollingBot {
                 case ALL -> sendIndexImoexData();
                 default -> unknownCommand(chatId);
             }
-        } else if (update.hasCallbackQuery()) {
+        } else if (update.hasCallbackQuery() && startWait == false) {
             createUserTickerList(update);
+
+        } else if (update.hasMessage() && update.getMessage().hasText() && startWait == true) {
+            createUserDeltaAndInterval(update);
         }
 
     }
@@ -115,7 +128,7 @@ public class Bot extends TelegramLongPollingBot {
                                                 
                 Здесь Вы сможете узнать официальные курсы валют на сегодня, установленные ЦБ РФ.
                 Следить за изменением цены акций, входящих в индекс Московской биржи
-                
+                                
                 Выбрать тикеры для отслеживания и получать уведомления об изменении цен на них.
                     - Эта опция в разработке
                     Е ху!
@@ -220,9 +233,92 @@ public class Bot extends TelegramLongPollingBot {
         sendMessage(idChat, String.valueOf(text));
     }
 
-    @Scheduled(fixedRate = 30000)
+    //@Scheduled(cron = "0 * * * *")
     private void sendCurrentPrices() throws serviceException, JsonProcessingException {
-        //sendIndexImoexData();
+
+        Map<String, String> mapAllTickers = null;
+        StringBuilder text = new StringBuilder();
+
+        try {
+            mapAllTickers = tickerPriceService.getAllImoexData();
+        } catch (serviceException e) {
+            throw new RuntimeException(e);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+
+        Map<String, String> mapIndextickers = null;
+        try {
+            mapIndextickers = indexService.getIndexList();
+        } catch (serviceException e) {
+            throw new RuntimeException(e);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+
+        Tguser tguser = new Tguser();
+
+        if (userRepository.findByChatid(idChat).isPresent()) {
+            tguser = userRepository.findByChatid(idChat).orElseThrow();
+        }
+        String tickers = tguser.getTickers();
+
+        if (tickers != null) {
+            tickers = tickers.substring(1, tickers.length() - 1);
+            String[] items = tickers.split("\\s*,\\s*");
+            for (String s : items) {
+                text.append(mapIndextickers.get(s) + " " + s + " " + mapAllTickers.get(s) + "\n");
+            }
+            sendMessage(idChat, text.toString());
+            text = null;
+        }
+
+    }
+
+    @Scheduled(fixedRate = 10000)
+    private void sendWheenDeltaActive() {
+        Tguser tguser = userRepository.findByChatid(idChat).orElseThrow(EntityNotFoundException::new);
+        double delta = tguser.getDelta();
+        String currentPriceImoex = null;
+        Double currentPrice = 0.0;
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(idChat));
+        List<Ticker> tickerList = tickerRepository.findAllByTguserId(tguser.getId());
+        if (!tickerList.isEmpty()) {
+            for (Ticker t : tickerList) {
+                try {
+                    currentPriceImoex = tickerPriceService.getTickerCurrencyPrice(t.getTicker());
+                    currentPrice = Double.parseDouble(currentPriceImoex);
+                } catch (SerialException e) {
+                    throw new RuntimeException(e);
+                } catch (serviceException e) {
+                    throw new RuntimeException(e);
+                } catch (JsonProcessingException e) {
+                    throw new RuntimeException(e);
+                }
+
+                if (Double.parseDouble(t.getPrice())<currentPrice){
+                    Double dl = currentPrice/Double.parseDouble(t.getPrice())*100-100;
+                    if (dl>=tguser.getDelta()){
+                       message.setText("Цена " + t.getTicker() + " изменилась прежняя цена " + t.getPrice() + " новая " + currentPrice + " увеличилась на " + dl + "%");
+                       executeMessage(message);
+                       Ticker updateTicker = tickerRepository.findByTicker(t.getTicker()).orElseThrow(EntityNotFoundException::new);
+                       updateTicker.setPrice(String.valueOf(currentPrice));
+                       tickerRepository.save(updateTicker);
+                    }
+                }
+
+                if (Double.parseDouble(t.getPrice())>currentPrice){
+                    Double dl = 100-Double.parseDouble(t.getPrice())/currentPrice*100;
+                    message.setText("Цена " + t.getTicker() + " изменилась прежняя цена " + t.getPrice() + " новая " + currentPrice + " уменьшилась на " + dl + "%");
+                    executeMessage(message);
+                    Ticker updateTicker = tickerRepository.findByTicker(t.getTicker()).orElseThrow(EntityNotFoundException::new);
+                    updateTicker.setPrice(String.valueOf(currentPrice));
+                    tickerRepository.save(updateTicker);
+                }
+
+            }
+        }
 
     }
 
@@ -237,8 +333,10 @@ public class Bot extends TelegramLongPollingBot {
     }
 
     private void unknownCommand(Long chatId) {
-        var text = "Не удалось распознать команду!";
-        sendMessage(chatId, text);
+        if (startWait == false) {
+            var text = "Не удалось распознать команду!";
+            sendMessage(chatId, text);
+        }
     }
 
     private void register(long chatId) {
@@ -297,6 +395,7 @@ public class Bot extends TelegramLongPollingBot {
      * Метод формирует список тикеров для последующего отслеживания цены для и записывает его в БД     *
      */
     private void createUserTickerList(Update update) {
+
         long messageId = update.getCallbackQuery().getMessage().getMessageId();
         long chatId = update.getCallbackQuery().getMessage().getChatId();
         Tguser tguser = new Tguser();
@@ -313,7 +412,8 @@ public class Bot extends TelegramLongPollingBot {
 
         switch (update.getCallbackQuery().getData()) {
             case "Save" -> {
-                String text = "Вы выбрали для отслеживания следующие акции  " + "\n\n" + setUserChoise.toString() + "\n\n" + "Если необходимо изменить выбор нажмите /settings ";
+                startWait = true;
+                String text = "Вы выбрали для отслеживания следующие акции  " + "\n\n" + setUserChoise.toString() + "\n\n" + "Если необходимо изменить выбор нажмите /settings " + "\n\n" + "Бот будет следить за котировками указанных акций. " + "\n\n" + "Как часто вы хотите получать уведомление о котировках? Введите данные в минутах";
                 executeEditMessageText(text, chatId, messageId);
 
                 if (userRepository.findByChatid(chatId).isEmpty()) {
@@ -324,7 +424,33 @@ public class Bot extends TelegramLongPollingBot {
                     tguser = userRepository.findByChatid(chatId).orElseThrow();
                     tguser.setTickers(setUserChoiseTickers.toString());
                     userRepository.save(tguser);
+
+                    // Если у пользователя уже есть отслеживаемые тикеры удаляем их из БД
+                    List<Ticker> tickerList = tickerRepository.findAllByTguserId(tguser.getId());
+                    if (!tickerList.isEmpty()) {
+                        System.out.println("Find");
+                        tickerRepository.deleteByTguser_id(tguser.getId());
+                    }
+
+                    // и заменяем на новые
+                    for (String s : setUserChoiseTickers) {
+                        Ticker ticker = new Ticker();
+                        ticker.setTguser(tguser);
+                        ticker.setTicker(s);
+                        try {
+                            ticker.setPrice(tickerPriceService.getTickerCurrencyPrice(s));
+                        } catch (SerialException e) {
+                            throw new RuntimeException(e);
+                        } catch (serviceException e) {
+                            throw new RuntimeException(e);
+                        } catch (JsonProcessingException e) {
+                            throw new RuntimeException(e);
+                        }
+                        tickerRepository.save(ticker);
+                        startWait = true;
+                    }
                 }
+
             }
             case "Cancel" -> setUserChoise.clear();
             default -> {
@@ -333,6 +459,50 @@ public class Bot extends TelegramLongPollingBot {
             }
         }
 
+    }
+
+    private void createUserDeltaAndInterval(Update update) {
+        Double delta = 0.0;
+        int interval = 0;
+        if (update.hasMessage() && update.getMessage().hasText() && startWait == true) {
+            SendMessage message = new SendMessage();
+            message.setChatId(String.valueOf(idChat));
+            if (flagDelta == false) {
+                try {
+                    delta = Double.parseDouble(update.getMessage().getText());
+                    Tguser updateUser = userRepository.findByChatid(idChat).orElseThrow(EntityNotFoundException::new);
+                    updateUser.setDelta(delta);
+                    userRepository.save(updateUser);
+
+                    message.setText("При изменении цены выбранных вами тикеров на " + delta + "% вы будете получать уведомления");
+                    executeMessage(message);
+                    startWait = false;
+                    flagDelta = true;
+
+                } catch (NumberFormatException e) {
+                    message.setText("Неверно введены данные о дельте, попробуйте еще раз");
+                    executeMessage(message);
+                }
+            } else {
+                try {
+                    interval = Integer.parseInt(update.getMessage().getText());
+                    message.setText("Каждые " + interval + " минут вы будете получать уведомления о текущей цене выбранных тикеров" + "\n" + "**мы записали ваше пожелание, но пока не знаем как это сделать и будем присылать каждый час");
+                    executeMessage(message);
+                    Tguser updateUser = userRepository.findByChatid(idChat).orElseThrow(EntityNotFoundException::new);
+                    updateUser.setInterval(interval);
+                    userRepository.save(updateUser);
+                    message.setText("Введите процент на который должно отклониться значение тикера для уведомлений." + "\n" + "Дробная часть указывается через точку (Например 5.5 или 4)");
+                    executeMessage(message);
+                    flagDelta = false;
+
+                } catch (NumberFormatException e) {
+                    message.setText("Неверно введены данные об интервале, попробуйте еще раз ");
+                    executeMessage(message);
+                }
+
+            }
+
+        }
     }
 
     /**
@@ -344,6 +514,7 @@ public class Bot extends TelegramLongPollingBot {
         message.setChatId(String.valueOf(chatId));
         message.setText(text);
         message.setMessageId((int) messageId);
+
 
         try {
             execute(message);
